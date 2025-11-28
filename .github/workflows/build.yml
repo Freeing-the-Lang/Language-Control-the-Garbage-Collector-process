@@ -9,6 +9,7 @@ permissions:
   contents: write
 
 jobs:
+
   autotag:
     name: Auto Tag
     runs-on: ubuntu-latest
@@ -43,18 +44,19 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
+
       - uses: actions/checkout@v4
 
 
       # --------------------------------------
-      # DIST 생성: 3OS 완전 호환 방식 (-p)
+      # DIST 생성 (전 OS 완전호환)
       # --------------------------------------
       - name: Prepare dist
         run: mkdir -p dist
 
 
       # --------------------------------------
-      # LINUX BUILD
+      # Linux BUILD
       # --------------------------------------
       - name: Build (Linux)
         if: runner.os == 'Linux'
@@ -64,7 +66,7 @@ jobs:
 
 
       # --------------------------------------
-      # MAC BUILD
+      # macOS BUILD
       # --------------------------------------
       - name: Build (macOS)
         if: runner.os == 'macOS'
@@ -74,16 +76,21 @@ jobs:
 
 
       # --------------------------------------
-      # WINDOWS BUILD
+      # Windows BUILD (MinGW)
       # --------------------------------------
+      - name: Install MinGW
+        if: runner.os == 'Windows'
+        run: |
+          choco install mingw --version=12.2.0 -y
+
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
-          cl src\\gc_controller.cpp src\\runtime_main.cpp /Fe:dist\\gc_runtime.exe
+          g++ src/*.cpp -o dist/gc_runtime.exe
 
 
       # --------------------------------------
-      # SHA256 (LINUX/MAC)
+      # SHA256 (Linux + macOS)
       # --------------------------------------
       - name: SHA256 Linux/Mac
         if: runner.os != 'Windows'
@@ -95,7 +102,7 @@ jobs:
 
 
       # --------------------------------------
-      # SHA256 (WINDOWS)
+      # SHA256 (Windows)
       # --------------------------------------
       - name: SHA256 Windows
         if: runner.os == 'Windows'
@@ -119,6 +126,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
@@ -132,6 +140,7 @@ jobs:
             zip -r "${d}.zip" "$d"
           done
 
+
       - name: ProofLedger
         run: |
           echo "GC-Control Runtime + SpongeLang Integration" > PROOF_LEDGER.txt
@@ -142,10 +151,10 @@ jobs:
           echo "Artifacts:" >> PROOF_LEDGER.txt
           ls release_builds >> PROOF_LEDGER.txt
 
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.autotag.outputs.new_tag }}
           files: |
             release_builds/*.zip
             PROOF_LEDGER.txt
-
