@@ -47,17 +47,13 @@ jobs:
 
       - uses: actions/checkout@v4
 
-
-      # --------------------------------------
-      # DIST 생성 (전 OS 완전호환)
-      # --------------------------------------
       - name: Prepare dist
         run: mkdir -p dist
 
 
-      # --------------------------------------
-      # Linux BUILD
-      # --------------------------------------
+      # -----------------------------
+      # Linux Build (g++)
+      # -----------------------------
       - name: Build (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -65,9 +61,9 @@ jobs:
           strip dist/gc_runtime
 
 
-      # --------------------------------------
-      # macOS BUILD
-      # --------------------------------------
+      # -----------------------------
+      # macOS Build (clang++)
+      # -----------------------------
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -75,23 +71,22 @@ jobs:
           strip dist/gc_runtime_macos
 
 
-      # --------------------------------------
-      # Windows BUILD (MinGW)
-      # --------------------------------------
-      - name: Install MinGW
+      # -----------------------------
+      # Windows Build (MSVC)
+      # -----------------------------
+      - name: Setup MSVC
         if: runner.os == 'Windows'
-        run: |
-          choco install mingw --version=12.2.0 -y
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
-          g++ src/*.cpp -o dist/gc_runtime.exe
+          cl.exe /EHsc src\\gc_controller.cpp src\\runtime_main.cpp /Fe:dist\\gc_runtime.exe
 
 
-      # --------------------------------------
+      # -----------------------------
       # SHA256 (Linux + macOS)
-      # --------------------------------------
+      # -----------------------------
       - name: SHA256 Linux/Mac
         if: runner.os != 'Windows'
         run: |
@@ -101,9 +96,9 @@ jobs:
           done
 
 
-      # --------------------------------------
+      # -----------------------------
       # SHA256 (Windows)
-      # --------------------------------------
+      # -----------------------------
       - name: SHA256 Windows
         if: runner.os == 'Windows'
         run: |
@@ -140,7 +135,6 @@ jobs:
             zip -r "${d}.zip" "$d"
           done
 
-
       - name: ProofLedger
         run: |
           echo "GC-Control Runtime + SpongeLang Integration" > PROOF_LEDGER.txt
@@ -150,7 +144,6 @@ jobs:
           echo "" >> PROOF_LEDGER.txt
           echo "Artifacts:" >> PROOF_LEDGER.txt
           ls release_builds >> PROOF_LEDGER.txt
-
 
       - uses: softprops/action-gh-release@v2
         with:
