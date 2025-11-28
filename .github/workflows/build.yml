@@ -1,9 +1,8 @@
-name: Auto-Tag-and-Release
+name: GC-Runtime-Release
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -11,112 +10,105 @@ permissions:
 
 jobs:
   autotag:
-    name: Auto Tag Version
+    name: Auto Tag
     runs-on: ubuntu-latest
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get latest tag
+      - name: Generate patch tag
         id: tag
         run: |
-          last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "last_tag=$last_tag"
-          
-          base=${last_tag#v}
-          major=$(echo $base | cut -d. -f1)
-          minor=$(echo $base | cut -d. -f2)
-          patch=$(echo $base | cut -d. -f3)
-
-          new_patch=$((patch + 1))
-          new_tag="v$major.$minor.$new_patch"
-
-          git tag "$new_tag"
-          git push origin "$new_tag"
-
+          last=$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
+          base=${last#v}
+          a=$(echo $base | cut -d. -f1)
+          b=$(echo $base | cut -d. -f2)
+          c=$(echo $base | cut -d. -f3)
+          new_tag="v$a.$b.$((c+1))"
+          git tag $new_tag
+          git push origin $new_tag
           echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
 
   build:
-    name: Build 3OS
-    runs-on: ${{ matrix.os }}
+    name: Build Executables
     needs: autotag
+    runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create dist
-        run: mkdir -p dist
-
-      - name: Build placeholder
+      - name: Build Executable
         run: |
-          echo "GC-Control runtime for ${{ matrix.os }}" > dist/runtime_${{ matrix.os }}.txt
+          mkdir -p dist
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            g++ src/*.cpp -o dist/gc_runtime
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            clang++ src/*.cpp -o dist/gc_runtime_macos
+          fi
+        shell: bash
 
-      - name: Generate SHA256 (Linux/Mac)
+      - name: Build Executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir dist
+          cl src\\gc_controller.cpp src\\runtime_main.cpp /Fe:dist\\gc_runtime.exe
+
+      - name: Generate SHA256
         if: runner.os != 'Windows'
-        run: |
-          cd dist
-          for f in *; do
-            sha256sum "$f" >> SHA256_PROOF.txt
-          done
+        run: cd dist && sha256sum * > SHA256_PROOF.txt
 
       - name: Generate SHA256 (Windows)
         if: runner.os == 'Windows'
-        run: |
-          cd dist
-          powershell -Command "Get-ChildItem | ForEach-Object { $h = Get-FileHash -Algorithm SHA256 $_; Write-Output ($h.Hash + '  ' + $_.Name) }" | Out-File -Encoding ascii SHA256_PROOF.txt
+        run: >
+          cd dist &&
+          powershell -Command
+          "Get-ChildItem | ForEach-Object {
+           $h = Get-FileHash -Algorithm SHA256 $_;
+           Write-Output ($h.Hash + '  ' + $_.Name)
+          }" | Out-File -Encoding ascii SHA256_PROOF.txt
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: GC-${{ matrix.os }}
+          name: GC-Runtime-${{ matrix.os }}
           path: dist/
 
   release:
-    name: Create Release
-    needs: [build, autotag]
+    name: Release Packaging
+    needs: [autotag, build]
     runs-on: ubuntu-latest
-    if: needs.autotag.outputs.new_tag != ''
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: release_assets
+          path: release_builds
 
-      - name: Zip Release Assets
+      - name: Zip Build Artifacts
         run: |
-          cd release_assets
+          cd release_builds
           for d in *; do
             zip -r "${d}.zip" "$d"
           done
 
-      - name: Generate ProofLedger
+      - name: ProofLedger
         run: |
-          echo "Language-Control-the-GC-process" > PROOF_LEDGER.txt
+          echo "GC-Control Runtime + SpongeLang Integration" > PROOF_LEDGER.txt
           echo "Tag: ${{ needs.autotag.outputs.new_tag }}" >> PROOF_LEDGER.txt
-          echo "Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> PROOF_LEDGER.txt
           echo "Commit: $GITHUB_SHA" >> PROOF_LEDGER.txt
-          echo "" >> PROOF_LEDGER.txt
-          echo "Artifacts:" >> PROOF_LEDGER.txt
-          ls release_assets >> PROOF_LEDGER.txt
+          echo "Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> PROOF_LEDGER.txt
 
-      - name: Upload Release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.autotag.outputs.new_tag }}
           files: |
-            release_assets/*.zip
+            release_builds/*.zip
             PROOF_LEDGER.txt
+
