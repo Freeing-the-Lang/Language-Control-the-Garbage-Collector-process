@@ -1,0 +1,99 @@
+name: GC-Control-Build-and-Proof
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: 3OS Build & Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        run: |
+          echo "GCCONTROL_BUILD_OS=${{ matrix.os }}" >> $GITHUB_ENV
+          echo "GCCONTROL_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+
+      - name: Build (placeholder)
+        run: |
+          echo "🔧 Future build step for GC-Control runtime..."
+          echo "No compiler yet – skipping."
+        shell: bash
+
+      - name: Create dist folder
+        run: mkdir -p dist
+
+      - name: Pack placeholder artifact
+        run: |
+          echo "GC Control Runtime – placeholder build for ${{ matrix.os }}" > dist/runtime_${{ matrix.os }}.txt
+
+      - name: Generate SHA256 Proof
+        if: runner.os != 'Windows'
+        run: |
+          cd dist
+          for f in *; do
+            sha256sum "$f" >> SHA256_PROOF.txt
+          done
+
+      - name: Generate SHA256 Proof (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd dist
+          powershell -Command "Get-ChildItem | ForEach-Object { Write-Output ((Get-FileHash -Algorithm SHA256 $_).Hash + '  ' + $_.Name) }" | Out-File -Encoding ascii SHA256_PROOF.txt
+
+      - name: Upload artifact (per OS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: GC-Control-${{ matrix.os }}
+          path: dist/*
+
+  release:
+    name: Release Packaging
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all OS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+
+      - name: Create Release ZIPs
+        run: |
+          cd release_assets
+          for d in *; do
+            zip -r "${d}.zip" "$d"
+          done
+
+      - name: Create ProofLedger
+        run: |
+          echo "Freeing-the-Lang – Language Control the Garbage Collector" > PROOF_LEDGER.txt
+          echo "Tag: $GITHUB_REF_NAME" >> PROOF_LEDGER.txt
+          echo "Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> PROOF_LEDGER.txt
+          echo "Commit: $GITHUB_SHA" >> PROOF_LEDGER.txt
+          echo "Artifacts: " >> PROOF_LEDGER.txt
+          ls release_assets >> PROOF_LEDGER.txt
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release_assets/*.zip
+            PROOF_LEDGER.txt
