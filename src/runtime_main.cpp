@@ -1,16 +1,17 @@
 #include "gc_controller.hpp"
 #include <iostream>
+#include <string>
 
 int main(int argc, char** argv) {
     GCController gc;
 
     if (argc < 2) {
         std::cout << "GC Runtime Usage:\n";
-        std::cout << "  gc-runtime setmode <auto|low|high|manual>\n";
-        std::cout << "  gc-runtime collect\n";
-        std::cout << "  gc-runtime freeze <name>\n";
-        std::cout << "  gc-runtime unfreeze <name>\n";
-        std::cout << "  gc-runtime suggest <hint>\n";
+        std::cout << "  gc_runtime setmode <auto|low|high|manual>\n";
+        std::cout << "  gc_runtime collect\n";
+        std::cout << "  gc_runtime freeze <name>\n";
+        std::cout << "  gc_runtime unfreeze <name>\n";
+        std::cout << "  gc_runtime suggest <hint>\n";
         return 0;
     }
 
@@ -42,4 +43,5 @@ int main(int argc, char** argv) {
 
     return 0;
 }
+
 
