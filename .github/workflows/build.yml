@@ -45,13 +45,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+
+      # --------------------------------------
+      # DIST 생성: 3OS 완전 호환 방식 (-p)
+      # --------------------------------------
       - name: Prepare dist
-        run: mkdir dist -Force
+        run: mkdir -p dist
 
 
-      # --------------------
-      # Linux Build
-      # --------------------
+      # --------------------------------------
+      # LINUX BUILD
+      # --------------------------------------
       - name: Build (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -59,9 +63,9 @@ jobs:
           strip dist/gc_runtime
 
 
-      # --------------------
-      # macOS Build
-      # --------------------
+      # --------------------------------------
+      # MAC BUILD
+      # --------------------------------------
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -69,19 +73,19 @@ jobs:
           strip dist/gc_runtime_macos
 
 
-      # --------------------
-      # Windows Build
-      # --------------------
+      # --------------------------------------
+      # WINDOWS BUILD
+      # --------------------------------------
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
           cl src\\gc_controller.cpp src\\runtime_main.cpp /Fe:dist\\gc_runtime.exe
 
 
-      # --------------------
-      # SHA256 for Linux/Mac
-      # --------------------
-      - name: Generate SHA256 (Linux/Mac)
+      # --------------------------------------
+      # SHA256 (LINUX/MAC)
+      # --------------------------------------
+      - name: SHA256 Linux/Mac
         if: runner.os != 'Windows'
         run: |
           cd dist
@@ -90,10 +94,10 @@ jobs:
           done
 
 
-      # --------------------
-      # SHA256 for Windows
-      # --------------------
-      - name: Generate SHA256 (Windows)
+      # --------------------------------------
+      # SHA256 (WINDOWS)
+      # --------------------------------------
+      - name: SHA256 Windows
         if: runner.os == 'Windows'
         run: |
           cd dist
@@ -128,7 +132,6 @@ jobs:
             zip -r "${d}.zip" "$d"
           done
 
-
       - name: ProofLedger
         run: |
           echo "GC-Control Runtime + SpongeLang Integration" > PROOF_LEDGER.txt
@@ -138,7 +141,6 @@ jobs:
           echo "" >> PROOF_LEDGER.txt
           echo "Artifacts:" >> PROOF_LEDGER.txt
           ls release_builds >> PROOF_LEDGER.txt
-
 
       - uses: softprops/action-gh-release@v2
         with:
