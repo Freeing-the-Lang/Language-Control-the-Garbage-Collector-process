@@ -22,25 +22,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up environment
+      - name: Prepare environment
         run: |
           echo "GCCONTROL_BUILD_OS=${{ matrix.os }}" >> $GITHUB_ENV
           echo "GCCONTROL_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
 
       - name: Build (placeholder)
         run: |
-          echo "🔧 Future build step for GC-Control runtime..."
-          echo "No compiler yet – skipping."
+          echo "GC-Control: no actual runtime yet – skipping build."
         shell: bash
 
-      - name: Create dist folder
+      - name: Create dist directory
         run: mkdir -p dist
 
-      - name: Pack placeholder artifact
+      - name: Create placeholder artifact
         run: |
           echo "GC Control Runtime – placeholder build for ${{ matrix.os }}" > dist/runtime_${{ matrix.os }}.txt
 
-      - name: Generate SHA256 Proof
+      - name: Generate SHA256 Proof (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
           cd dist
@@ -52,13 +51,13 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           cd dist
-          powershell -Command "Get-ChildItem | ForEach-Object { Write-Output ((Get-FileHash -Algorithm SHA256 $_).Hash + '  ' + $_.Name) }" | Out-File -Encoding ascii SHA256_PROOF.txt
+          powershell -Command "Get-ChildItem | ForEach-Object { $h = Get-FileHash -Algorithm SHA256 $_; Write-Output ($h.Hash + '  ' + $_.Name) }" | Out-File -Encoding ascii SHA256_PROOF.txt
 
-      - name: Upload artifact (per OS)
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: GC-Control-${{ matrix.os }}
-          path: dist/*
+          path: dist/
 
   release:
     name: Release Packaging
@@ -75,25 +74,27 @@ jobs:
         with:
           path: release_assets
 
-      - name: Create Release ZIPs
+      - name: Zip all OS builds
         run: |
           cd release_assets
           for d in *; do
             zip -r "${d}.zip" "$d"
           done
 
-      - name: Create ProofLedger
+      - name: Generate ProofLedger
         run: |
-          echo "Freeing-the-Lang – Language Control the Garbage Collector" > PROOF_LEDGER.txt
+          echo "Freeing-the-Lang – Language-Control-the-GC-process" > PROOF_LEDGER.txt
           echo "Tag: $GITHUB_REF_NAME" >> PROOF_LEDGER.txt
           echo "Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> PROOF_LEDGER.txt
           echo "Commit: $GITHUB_SHA" >> PROOF_LEDGER.txt
-          echo "Artifacts: " >> PROOF_LEDGER.txt
+          echo "" >> PROOF_LEDGER.txt
+          echo "Artifacts:" >> PROOF_LEDGER.txt
           ls release_assets >> PROOF_LEDGER.txt
 
-      - name: Upload Release Assets
+      - name: Upload release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             release_assets/*.zip
             PROOF_LEDGER.txt
+
