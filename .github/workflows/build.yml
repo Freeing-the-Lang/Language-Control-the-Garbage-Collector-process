@@ -33,6 +33,7 @@ jobs:
           git push origin $new_tag
           echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
 
+
   build:
     name: Build Executables
     needs: autotag
@@ -44,40 +45,69 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Executable
-        run: |
-          mkdir -p dist
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            g++ src/*.cpp -o dist/gc_runtime
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            clang++ src/*.cpp -o dist/gc_runtime_macos
-          fi
-        shell: bash
+      - name: Prepare dist
+        run: mkdir dist -Force
 
-      - name: Build Executable (Windows)
+
+      # --------------------
+      # Linux Build
+      # --------------------
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          g++ src/*.cpp -o dist/gc_runtime
+          strip dist/gc_runtime
+
+
+      # --------------------
+      # macOS Build
+      # --------------------
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          clang++ src/*.cpp -o dist/gc_runtime_macos
+          strip dist/gc_runtime_macos
+
+
+      # --------------------
+      # Windows Build
+      # --------------------
+      - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
-          mkdir dist
           cl src\\gc_controller.cpp src\\runtime_main.cpp /Fe:dist\\gc_runtime.exe
 
-      - name: Generate SHA256
-        if: runner.os != 'Windows'
-        run: cd dist && sha256sum * > SHA256_PROOF.txt
 
+      # --------------------
+      # SHA256 for Linux/Mac
+      # --------------------
+      - name: Generate SHA256 (Linux/Mac)
+        if: runner.os != 'Windows'
+        run: |
+          cd dist
+          for f in *; do
+            sha256sum "$f" >> SHA256_PROOF.txt
+          done
+
+
+      # --------------------
+      # SHA256 for Windows
+      # --------------------
       - name: Generate SHA256 (Windows)
         if: runner.os == 'Windows'
-        run: >
-          cd dist &&
-          powershell -Command
-          "Get-ChildItem | ForEach-Object {
-           $h = Get-FileHash -Algorithm SHA256 $_;
-           Write-Output ($h.Hash + '  ' + $_.Name)
+        run: |
+          cd dist
+          powershell -Command "Get-ChildItem | ForEach-Object {
+            $h = Get-FileHash -Algorithm SHA256 $_;
+            Write-Output ($h.Hash + '  ' + $_.Name)
           }" | Out-File -Encoding ascii SHA256_PROOF.txt
+
 
       - uses: actions/upload-artifact@v4
         with:
           name: GC-Runtime-${{ matrix.os }}
           path: dist/
+
 
   release:
     name: Release Packaging
@@ -98,12 +128,17 @@ jobs:
             zip -r "${d}.zip" "$d"
           done
 
+
       - name: ProofLedger
         run: |
           echo "GC-Control Runtime + SpongeLang Integration" > PROOF_LEDGER.txt
           echo "Tag: ${{ needs.autotag.outputs.new_tag }}" >> PROOF_LEDGER.txt
           echo "Commit: $GITHUB_SHA" >> PROOF_LEDGER.txt
           echo "Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> PROOF_LEDGER.txt
+          echo "" >> PROOF_LEDGER.txt
+          echo "Artifacts:" >> PROOF_LEDGER.txt
+          ls release_builds >> PROOF_LEDGER.txt
+
 
       - uses: softprops/action-gh-release@v2
         with:
