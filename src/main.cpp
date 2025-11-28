@@ -1,25 +1,45 @@
 #include "gc_controller.hpp"
 #include <iostream>
 
-int main() {
+int main(int argc, char** argv) {
     GCController gc;
 
-    gc.setMode(GCMode::Auto);
+    if (argc < 2) {
+        std::cout << "GC Runtime Usage:\n";
+        std::cout << "  gc-runtime setmode <auto|low|high|manual>\n";
+        std::cout << "  gc-runtime collect\n";
+        std::cout << "  gc-runtime freeze <name>\n";
+        std::cout << "  gc-runtime unfreeze <name>\n";
+        std::cout << "  gc-runtime suggest <hint>\n";
+        return 0;
+    }
 
-    std::cout << "\n=== GC Control Script Demo ===\n\n";
+    std::string cmd = argv[1];
 
-    gc.suggest("realtime");
-    gc.freezeRegion("parser_heap");
-    gc.collectNow();
+    if (cmd == "setmode" && argc >= 3) {
+        std::string m = argv[2];
+        if (m == "auto") gc.setMode(GCMode::Auto);
+        else if (m == "low") gc.setMode(GCMode::LowLatency);
+        else if (m == "high") gc.setMode(GCMode::HighThroughput);
+        else if (m == "manual") gc.setMode(GCMode::Manual);
+    }
 
-    gc.unfreezeRegion("parser_heap");
-    gc.suggest("batch");
-    gc.collectNow();
+    else if (cmd == "collect") {
+        gc.collectNow();
+    }
 
-    const GCStats& s = gc.stats();
-    std::cout << "\nGC Stats:\n";
-    std::cout << "  Cycles      : " << s.cycles << "\n";
-    std::cout << "  Last Pause  : " << s.last_pause.count() << "us\n";
+    else if (cmd == "freeze" && argc >= 3) {
+        gc.freezeRegion(argv[2]);
+    }
+
+    else if (cmd == "unfreeze" && argc >= 3) {
+        gc.unfreezeRegion(argv[2]);
+    }
+
+    else if (cmd == "suggest" && argc >= 3) {
+        gc.suggest(argv[2]);
+    }
 
     return 0;
 }
+
